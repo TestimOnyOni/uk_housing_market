@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+
+# Envs
+.venv/
+.env
+
+# Streamlit local state
+.streamlit/secrets.toml
+
+# Artifacts (keep these tracked unless too large)
+# artifacts/*.pkl
+# artifacts/*.faiss
+
+# Data (keep small samples tracked; big files via LFS)
+# data/*.csv
+
+*.ipynb_checkpoints
+*.ipynb
+*.pdf
