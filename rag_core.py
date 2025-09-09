@@ -1,42 +1,90 @@
-# rag_core.py
-from __future__ import annotations
 import os
-import re
-import json
-from typing import List, Optional, Dict, Any, Tuple
+import pickle
 import numpy as np
 import pandas as pd
-import joblib
-from pydantic import BaseModel, Field
+from typing import Dict, Any, Optional, List
+from sklearn.preprocessing import LabelEncoder
+import xgboost as xgb
+
+# --------------------------
+# Knowledge Base Context
+# --------------------------
+class KBContext:
+    def __init__(self, df: pd.DataFrame, encoders: Dict[str, LabelEncoder], stats: Dict[str, Any], feature_order: List[str]):
+        self.df = df
+        self.encoders = encoders
+        self.stats = stats
+        self.feature_order = feature_order
+
+    @classmethod
+    def load(cls, artifact_dir: str) -> "KBContext":
+        df = pd.read_csv(os.path.join(artifact_dir, "properties.csv"))
+
+        with open(os.path.join(artifact_dir, "encoders.pkl"), "rb") as f:
+            encoders = pickle.load(f)
+        with open(os.path.join(artifact_dir, "stats.pkl"), "rb") as f:
+            stats = pickle.load(f)
+        with open(os.path.join(artifact_dir, "feature_order.pkl"), "rb") as f:
+            feature_order = pickle.load(f)
+
+        return cls(df, encoders, stats, feature_order)
 
 
-# =========================
-# Embeddings
-# =========================
-USE_OPENAI_EMBEDDINGS = os.getenv("USE_OPENAI_EMBEDDINGS", "false").lower() == "true"
-OPENAI_EMBED_MODEL = os.getenv("OPENAI_EMBED_MODEL", "text-embedding-3-small")
-LOCAL_EMBED_MODEL = os.getenv("LOCAL_EMBED_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
-OPENAI_CHAT_MODEL = os.getenv("OPENAI_CHAT_MODEL", "gpt-4o-mini")
+# --------------------------
+# Predictor Wrapper
+# --------------------------
+class XGBPredictor:
+    def __init__(self, model: xgb.Booster, feature_order: List[str]):
+        self.model = model
+        self.feature_order = feature_order
 
-class Embedder:
-    def __init__(self, use_openai: bool = USE_OPENAI_EMBEDDINGS):
-        self.use_openai = use_openai
-        if use_openai:
-            from openai import OpenAI
-            self.client = OpenAI()
-        else:
-            from sentence_transformers import SentenceTransformer
-            self.model = SentenceTransformer(LOCAL_EMBED_MODEL)
+    @classmethod
+    def load(cls, artifact_dir: str) -> "XGBPredictor":
+        with open(os.path.join(artifact_dir, "xgb_model.pkl"), "rb") as f:
+            model = pickle.load(f)
+        with open(os.path.join(artifact_dir, "feature_order.pkl"), "rb") as f:
+            feature_order = pickle.load(f)
+        return cls(model, feature_order)
 
-    def embed(self, texts: List[str]) -> np.ndarray:
-        if self.use_openai:
-            # Batch to respect token limits
-            from openai import OpenAI
-            chunks = [texts[i:i+256] for i in range(0, len(texts), 256)]
-            vecs: List[np.ndarray] = []
-            for ch in chunks:
-                resp = self.client.embeddings.create(model=OPENAI_EMBED_MODEL, input=ch)
-                arr = np.array([d.embedding for d in resp.data], dtype=np.float32)
-                vecs.append(arr)
-            out = np.vstack(vecs) if vecs else np.zeros((0, 1536), dtype=np.float32)
-            return out
+    def predict(self, feats: Dict[str, Any], encoders: Dict[str, LabelEncoder], stats: Dict[str, Any]) -> float:
+        vec = []
+        for col in self.feature_order:
+            val = feats.get(col)
+            if val is None:
+                val = stats[col]
+            if col in encoders:
+                val = encoders[col].transform([val])[0]
+            vec.append(val)
+
+        dmatrix = xgb.DMatrix(np.array([vec]), feature_names=self.feature_order)
+        return float(self.model.predict(dmatrix)[0])
+
+
+# --------------------------
+# Query Handler
+# --------------------------
+def handle_query(q: str, kb: KBContext, predictor: XGBPredictor, llm: Optional[object] = None) -> str:
+    """
+    q: user question in natural language
+    kb: knowledge base context (data + encoders + stats)
+    predictor: trained model wrapper
+    llm: optional LLM for better NLP parsing (not required here)
+    """
+    # --- very basic feature extraction ---
+    feats: Dict[str, Any] = {}
+
+    # You can make this smarter; for now it's just a placeholder
+    if "shoreditch" in q.lower():
+        feats["Location_City"] = "London"
+        feats["Location_District"] = "Shoreditch"
+    if "townhouse" in q.lower():
+        feats["Property_Type"] = "Townhouse"
+    if "4-bed" in q.lower() or "4 bed" in q.lower():
+        feats["Bedrooms"] = 4
+    if "2008" in q:
+        feats["Year_Built"] = 2008
+
+    # Run prediction
+    pred_val = predictor.predict(feats, kb.encoders, kb.stats)
+
+    return f"Predicted (Price_Boxcox scale): {pred_val:.2f}"
