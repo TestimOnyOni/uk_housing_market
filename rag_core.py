@@ -18,7 +18,7 @@ class KBContext:
 
     @classmethod
     def load(cls, artifact_dir: str) -> "KBContext":
-        df = pd.read_csv(os.path.join(artifact_dir, "properties.csv"))
+        df = pd.read_csv(os.path.join(artifact_dir, "uk_housing_market_data.csv"))
 
         with open(os.path.join(artifact_dir, "encoders.pkl"), "rb") as f:
             encoders = pickle.load(f)
