@@ -94,5 +94,4 @@ def handle_query(q: str, kb: KBContext, predictor: XGBPredictor, llm: Optional[o
             feats = feats.__dict__       # fallback
     pred_val = predictor.predict(feats, kb.encoders, kb.stats)
 
-
     return f"Predicted (Price_Boxcox scale): {pred_val:.2f}"
