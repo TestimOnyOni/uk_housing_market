@@ -40,7 +40,7 @@ class XGBPredictor:
 
     @classmethod
     def load(cls, artifact_dir: str) -> "XGBPredictor":
-        with open(os.path.join(artifact_dir, "xgb_model.pkl"), "rb") as f:
+        with open(os.path.join(artifact_dir, "model_xgb.pkl"), "rb") as f:
             model = pickle.load(f)
         with open(os.path.join(artifact_dir, "feature_order.pkl"), "rb") as f:
             feature_order = pickle.load(f)
