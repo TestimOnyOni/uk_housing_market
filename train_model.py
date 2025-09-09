@@ -69,7 +69,7 @@ def main():
         colsample_bytree=0.8,
         random_state=42,
     )
-    
+
     model.fit(X_train, y_train)
 
     print(f"Validation R^2: {model.score(X_test, y_test):.4f}")
