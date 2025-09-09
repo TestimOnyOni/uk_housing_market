@@ -38,28 +38,29 @@ class XGBPredictor:
         self.model = model
         self.feature_order = feature_order
 
-    # @classmethod
-    # def load(cls, artifact_dir: str) -> "XGBPredictor":
-    #     with open(os.path.join(artifact_dir, "model_xgb.pkl"), "rb") as f:
-    #         model = pickle.load(f)
-    #     with open(os.path.join(artifact_dir, "feature_order.pkl"), "rb") as f:
-    #         feature_order = pickle.load(f)
-    #     return cls(model, feature_order)
-    
-    
     @classmethod
-    def load(cls, artifact_dir: str) -> "KBContext":
-        # remove properties.csv if not needed
-        df = pd.DataFrame()  # or None
-
-        with open(os.path.join(artifact_dir, "encoders.pkl"), "rb") as f:
-            encoders = pickle.load(f)
-        with open(os.path.join(artifact_dir, "stats.pkl"), "rb") as f:
-            stats = pickle.load(f)
+    def load(cls, artifact_dir: str) -> "XGBPredictor":
+        df = pd.read_csv(os.path.join(artifact_dir, "uk_housing_market_data.csv"))
+        with open(os.path.join(artifact_dir, "model_xgb.pkl"), "rb") as f:
+            model = pickle.load(f)
         with open(os.path.join(artifact_dir, "feature_order.pkl"), "rb") as f:
             feature_order = pickle.load(f)
+        return cls(model, feature_order)
+    
 
-        return cls(df, encoders, stats, feature_order)
+    # @classmethod
+    # def load(cls, artifact_dir: str) -> "KBContext":
+    #     # remove properties.csv if not needed
+    #     df = pd.DataFrame()  # or None
+
+    #     with open(os.path.join(artifact_dir, "encoders.pkl"), "rb") as f:
+    #         encoders = pickle.load(f)
+    #     with open(os.path.join(artifact_dir, "stats.pkl"), "rb") as f:
+    #         stats = pickle.load(f)
+    #     with open(os.path.join(artifact_dir, "feature_order.pkl"), "rb") as f:
+    #         feature_order = pickle.load(f)
+
+    #     return cls(df, encoders, stats, feature_order)
 
     
     def predict(self, feats: Dict[str, Any], encoders: Dict[str, LabelEncoder], stats: Dict[str, Any]) -> float:
