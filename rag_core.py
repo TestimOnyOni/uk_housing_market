@@ -34,32 +34,97 @@ class KBContext:
 # Predictor Wrapper
 # --------------------------
 class XGBPredictor:
-    def __init__(self, model: xgb.Booster, feature_order: List[str]):
+    def __init__(self, model=None, feature_order: List[str] = None):
         self.model = model
         self.feature_order = feature_order
 
+    # ---------------------------
+    # Training
+    # ---------------------------
     @classmethod
-    def load(cls, artifact_dir: str) -> "XGBPredictor":
-        df = pd.read_csv(os.path.join(artifact_dir, "uk_housing_market_data.csv"))
-        with open(os.path.join(artifact_dir, "model_xgb.pkl"), "rb") as f:
-            model = pickle.load(f)
-        with open(os.path.join(artifact_dir, "feature_order.pkl"), "rb") as f:
-            feature_order = pickle.load(f)
-        return cls(model, feature_order)
+    def train(
+        cls,
+        train_df,
+        target_col: str,
+        feature_order: List[str],
+        encoders: Dict[str, Any],
+        stats: Dict[str, Any],
+        params: Dict[str, Any] = None,
+        num_boost_round: int = 200,
+    ):
+        """
+        Train an XGBoost model.
+        """
+        if params is None:
+            params = {
+                "objective": "reg:squarederror",
+                "eval_metric": "rmse",
+                "seed": 42,
+            }
 
-    
-    def predict(self, feats: Dict[str, Any], encoders: Dict[str, LabelEncoder], stats: Dict[str, Any]) -> float:
+        # Encode training data into numeric matrix
+        X = []
+        for _, row in train_df.iterrows():
+            vec = []
+            for col in feature_order:
+                val = row[col]
+                if col in encoders:
+                    val = encoders[col].transform([val])[0]
+                vec.append(val)
+            X.append(vec)
+
+        X = np.array(X)
+        y = train_df[target_col].values
+
+        dtrain = xgb.DMatrix(X, label=y, feature_names=feature_order)
+        model = xgb.train(params, dtrain, num_boost_round=num_boost_round)
+
+        return cls(model=model, feature_order=feature_order)
+
+    # ---------------------------
+    # Prediction
+    # ---------------------------
+    def predict(self, feats: Dict[str, Any], encoders, stats) -> float:
+        """
+        Predict target value for raw feature dict.
+        """
         vec = []
         for col in self.feature_order:
             val = feats.get(col)
+
+            # Fill missing values from dataset stats
             if val is None:
                 val = stats[col]
+
+            # Encode categorical
             if col in encoders:
                 val = encoders[col].transform([val])[0]
+
             vec.append(val)
 
-        dmatrix = xgb.DMatrix(np.array([vec]), feature_names=self.feature_order)
+        arr = np.array([vec])
+        dmatrix = xgb.DMatrix(arr, feature_names=self.feature_order)
         return float(self.model.predict(dmatrix)[0])
+
+    # ---------------------------
+    # Save + Load
+    # ---------------------------
+    def save(self, out_dir: str):
+        os.makedirs(out_dir, exist_ok=True)
+        self.model.save_model(os.path.join(out_dir, "xgb_model.json"))
+
+        with open(os.path.join(out_dir, "feature_order.pkl"), "wb") as f:
+            pickle.dump(self.feature_order, f)
+
+    @classmethod
+    def load(cls, in_dir: str):
+        model = xgb.Booster()
+        model.load_model(os.path.join(in_dir, "xgb_model.json"))
+
+        with open(os.path.join(in_dir, "feature_order.pkl"), "rb") as f:
+            feature_order = pickle.load(f)
+
+        return cls(model=model, feature_order=feature_order)
 
 
 # --------------------------
