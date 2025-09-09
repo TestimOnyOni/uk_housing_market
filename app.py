@@ -10,7 +10,7 @@ def load_kb_and_model():
     kb = KBContext.load("artifacts")
 
     # Load trained predictor
-    with open("artifacts/xgb_model.pkl", "rb") as f:
+    with open("artifacts/model_xgb.pkl", "rb") as f:
         predictor = pickle.load(f)
 
     return kb, predictor
