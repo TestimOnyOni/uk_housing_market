@@ -40,7 +40,7 @@ class XGBPredictor:
 
     @classmethod
     def load(cls, artifact_dir: str) -> "XGBPredictor":
-        df = pd.read_csv(os.path.join(artifact_dir, "data/uk_housing_market_data.csv"))
+        df = pd.read_csv(os.path.join(artifact_dir, "uk_housing_market_data.csv"))
         with open(os.path.join(artifact_dir, "model_xgb.pkl"), "rb") as f:
             model = pickle.load(f)
         with open(os.path.join(artifact_dir, "feature_order.pkl"), "rb") as f:
