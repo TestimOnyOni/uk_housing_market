@@ -22,11 +22,19 @@ class XGBPredictor:
             val = feats.get(col)
             if val is None:
                 val = stats[col]
+            # if col in encoders:
+            #     val = encoders[col].transform([val])[0]
+            # vec.append(val)
             if col in encoders:
-                val = encoders[col].transform([val])[0]
-            vec.append(val)
+                try:
+                    val = encoders[col].transform([val])[0]
+                except Exception:
+                    val = stats[col] # fallback: use stats if encoding fails
+            vec.append(float(val))
 
-        arr = np.array([vec])
+
+        # arr = np.array([vec])
+        arr = np.array([vec], dtype=float)   # force numeric array
         dmatrix = xgb.DMatrix(arr, feature_names=self.feature_order)
         return float(self.model.predict(dmatrix)[0])
 

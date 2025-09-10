@@ -151,12 +151,7 @@ def handle_query(q: str, kb: KBContext, predictor: XGBPredictor, llm: Optional[o
     if "2008" in q:
         feats["Year_Built"] = 2008
 
-    # Run prediction
-    # if not isinstance(feats, dict):
-    #     try:
-    #         feats = feats.model_dump()  # Pydantic v2
-    #     except AttributeError:
-    #         feats = feats.__dict__       # fallback
+
     pred_val = predictor.predict(feats, kb.encoders, kb.stats)
 
     return f"Predicted (Price_Boxcox scale): {pred_val:.2f}"
