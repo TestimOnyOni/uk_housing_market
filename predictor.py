@@ -22,34 +22,16 @@ class XGBPredictor:
             val = feats.get(col)
             if val is None:
                 val = stats[col]
-            # if col in encoders:
-            #     val = encoders[col].transform([val])[0]
-            # vec.append(val)
             if col in encoders:
-                try:
-                    val = encoders[col].transform([val])[0]
-                except Exception:
-                    val = stats[col] # fallback: use stats if encoding fails
-            vec.append(float(val))
+                val = encoders[col].transform([val])[0]
+            vec.append(val)
 
-
-        # arr = np.array([vec])
-        arr = np.array([vec], dtype=float)   # force numeric array
+        arr = np.array([vec])
         dmatrix = xgb.DMatrix(arr, feature_names=self.feature_order)
         return float(self.model.predict(dmatrix)[0])
 
-
     @classmethod
-    def train(
-        cls,
-        df,
-        target_col,
-        feature_order,
-        encoders,
-        stats,
-        params=None,
-        num_boost_round=300,
-    ):
+    def train(cls, df, target_col, feature_order, encoders, stats, params=None, num_boost_round=300):
         X, y = [], []
         for _, row in df.iterrows():
             vec = []
@@ -58,27 +40,18 @@ class XGBPredictor:
                 if pd.isna(val):
                     val = stats[col]
                 if col in encoders:
-                    try:
-                        val = encoders[col].transform([val])[0]
-                    except Exception:
-                        val = stats[col]
-                vec.append(float(val))   # ✅ enforce float
+                    val = encoders[col].transform([val])[0]
+                vec.append(val)
             X.append(vec)
-            y.append(float(row[target_col]))   # ✅ enforce float target
+            y.append(row[target_col])
 
-        X = np.array(X, dtype=float)
-        y = np.array(y, dtype=float)
+        X = np.array(X)
+        y = np.array(y)
 
         dtrain = xgb.DMatrix(X, label=y, feature_names=feature_order)
-        model = xgb.train(
-            params or {"objective": "reg:squarederror"},
-            dtrain,
-            num_boost_round=num_boost_round,
-        )
+        model = xgb.train(params or {"objective": "reg:squarederror"}, dtrain, num_boost_round=num_boost_round)
 
         return cls(model, feature_order, encoders, stats)
-
-
 
     def save(self, path: str):
         os.makedirs(path, exist_ok=True)
